@@ -14,19 +14,16 @@ class TimedQuineMcCluskey(QuineMcCluskey):
         if dc is None:
             dc = []
 
-        # Reset profiling counters (kept from original implementation)
         self.profile_cmp = 0
         self.profile_xor = 0
         self.profile_xnor = 0
 
         terms = set(ones) | set(dc)
         if len(terms) == 0:
-            # No work to do, set times to zero
             self.time_phase1 = 0.0
             self.time_phase2 = 0.0
             return None
 
-        # Calculate the number of bits to use
         if num_bits is not None:
             self.n_bits = num_bits
         else:
@@ -50,7 +47,6 @@ class TimedQuineMcCluskey(QuineMcCluskey):
         )
         t2 = perf_counter()
 
-        # Store timings in seconds
         self.time_phase1 = t1 - t0
         self.time_phase2 = t2 - t1
 
