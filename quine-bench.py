@@ -1,73 +1,95 @@
 import random
-from quine_mccluskey.qm import QuineMcCluskey
 from time import perf_counter
 
-# --- CONFIGURAÇÕES DO TESTE ---
-NUM_EXECUCOES_POR_TESTE = 10  # Reduzido para testes rápidos (Aumente para 100+ no teste final)
+from timed_qm import TimedQuineMcCluskey
+
+# --- TEST CONFIGURATIONS ---
+NUM_EXECUTIONS_PER_TEST = 1
 VAR_MIN = 4
-VAR_MAX = 12
-# Para cada N variáveis, usaremos cerca de 25% dos minterms possíveis.
-# Isso garante um bom número de implicantes primos para desafiar o algoritmo.
-DENSIDADE_MINTERMS = 0.25 
-# -----------------------------
+VAR_MAX = 13
+# For each N variables, we'll use about 25% of possible minterms.
+# This ensures a good number of prime implicants to challenge the algorithm.
+DENSITY_MINTERMS = 0.25 
+# ----------------------------
 
 def generate_random_function(n, density):
-    """Gera minterms aleatórios para n variáveis com base na densidade."""
+    """Generates random minterms for n variables based on density."""
     max_minterm = 2**n - 1
     num_minterms = int(max_minterm * density)
     
-    # Seleciona minterms aleatórios (sem repetição)
+    # Select random minterms (without repetition)
     minterms = random.sample(range(max_minterm + 1), num_minterms)
     
-    # Opcional: Adicionar alguns don't cares (ex: 5% do total)
+    # Optional: Add some don't cares (e.g., 5% of total)
     num_dont_cares = int(max_minterm * 0.05)
     
-    # Gera don't cares a partir do que sobrou do universo
+    # Generate don't cares from the remaining universe
     remaining_minterms = list(set(range(max_minterm + 1)) - set(minterms))
     dont_cares = random.sample(remaining_minterms, min(len(remaining_minterms), num_dont_cares))
     
     return minterms, dont_cares
 
-def run_performance_test(n, minterms, dont_cares, num_execucoes):
-    """Executa o QMC e mede o tempo médio."""
+def run_performance_test(n, minterms, dont_cares, num_executions):
+    """Executes QMC and measures average time for total, phase1 and phase2."""
     if not minterms and not dont_cares:
-        return 0.0
+        return 0.0, 0.0, 0.0
 
-    # Mede o tempo de várias execuções (sem prints)
-    start = perf_counter()
-    for _ in range(num_execucoes):
-        qm = QuineMcCluskey(False)
+    total_time = 0.0
+    total_phase1 = 0.0
+    total_phase2 = 0.0
+
+    # Measures time over multiple executions (without prints)
+    for _ in range(num_executions):
+        qm = TimedQuineMcCluskey()
+        start = perf_counter()
         qm.simplify(minterms, dont_cares)
-    end = perf_counter()
+        end = perf_counter()
 
-    return (end - start) / num_execucoes
+        total_time += end - start
+        total_phase1 += getattr(qm, "time_phase1", 0.0)
+        total_phase2 += getattr(qm, "time_phase2", 0.0)
 
-# --- LOOP PRINCIPAL DE TESTE ---
+    avg_time = total_time / num_executions
+    avg_phase1 = total_phase1 / num_executions
+    avg_phase2 = total_phase2 / num_executions
 
-print(f"Iniciando Teste de Escalabilidade QMC ({VAR_MIN} a {VAR_MAX} variáveis)")
-print("-" * 50)
-print(f"| N Vars | Minterms | Don't Cares | Tempo Médio (ms) |")
-print("-" * 50)
+    return avg_time, avg_phase1, avg_phase2
 
-# Lista para armazenar os resultados (para plotar o gráfico no relatório)
+# --- MAIN TEST LOOP ---
+
+print(f"Starting QMC Scalability Test ({VAR_MIN} to {VAR_MAX} variables)")
+print("-" * 95)
+print(f"| N Vars | Minterms | Don't Cares | Total (ms) | Phase1 (ms) | Phase2 (ms) |")
+print("-" * 95)
+
+# List to store results (for plotting the graph in the report)
 results_data = []
 
 for n in range(VAR_MIN, VAR_MAX + 1):
-    # 1. Gera função aleatória para N variáveis
-    minterms, dont_cares = generate_random_function(n, DENSIDADE_MINTERMS)
-    
-    # 2. Executa o teste de performance
-    tempo_medio_s = run_performance_test(n, minterms, dont_cares, NUM_EXECUCOES_POR_TESTE)
-    tempo_medio_ms = tempo_medio_s * 1000
+    # 1. Generate random function for N variables
+    minterms, dont_cares = generate_random_function(n, DENSITY_MINTERMS)
 
-    # 3. Armazena e imprime o resultado
+    # 2. Execute performance test
+    avg_time_s, phase1_s, phase2_s = run_performance_test(
+        n, minterms, dont_cares, NUM_EXECUTIONS_PER_TEST
+    )
+    avg_time_ms = avg_time_s * 1000
+    phase1_ms = phase1_s * 1000
+    phase2_ms = phase2_s * 1000
+
+    # 3. Store and print the result
     results_data.append({
         'n_vars': n,
         'num_minterms': len(minterms),
-        'time_ms': tempo_medio_ms
+        'time_ms_total': avg_time_ms,
+        'time_ms_phase1': phase1_ms,
+        'time_ms_phase2': phase2_ms,
     })
-    
-    print(f"| {n:^6} | {len(minterms):^8} | {len(dont_cares):^11} | {tempo_medio_ms:^16.4f} |")
 
-print("-" * 50)
-print("Teste concluído. Use os dados acima para gerar o gráfico de escalabilidade (Seção III).")
+    print(
+        f"| {n:^6} | {len(minterms):^8} | {len(dont_cares):^11} | "
+        f"{avg_time_ms:^10.4f} | {phase1_ms:^11.4f} | {phase2_ms:^11.4f} |"
+    )
+
+print("-" * 95)
+print("Test completed.")
