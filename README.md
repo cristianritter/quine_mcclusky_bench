@@ -15,14 +15,14 @@ The generated plot is saved as `runtime_scalability_qmc.pdf`, suitable for inclu
 
 - `quine-bench.py`
   - Generates random Boolean functions for `n` variables.
-  - Runs the QuineMcCluskey algorithm multiple times for each `n`.
-  - Measures and prints the **average runtime** for each number of variables.
+  - Runs the QuineMcCluskey algorithm (via a timing wrapper) multiple times for each `n`.
+  - Measures and prints the **average runtime**, split into **Total**, **Phase 1** (Prime Implicant generation) and **Phase 2** (Minimal Covering) for each number of variables.
   - This script is used to obtain the timing data that can be manually transferred to the plotting script or to a report.
 
 - `graphic-gen.py`
-  - Contains the **experimental data** in a Python dictionary (number of variables, number of minterms, number of dont cares, and average runtime in milliseconds).
+  - Contains the **experimental data** in a Python dictionary (number of variables, number of minterms, number of don't cares, and measured runtimes in milliseconds).
   - Builds a **Pandas DataFrame** from those values.
-  - Generates a **log-scale runtime vs. variables plot** using Matplotlib.
+  - Generates a **log-scale runtime vs. variables plot** using Matplotlib with three curves: **Total**, **Phase 1**, and **Phase 2**.
   - Saves the plot as `runtime_scalability_qmc.pdf` and prints a formatted results table.
 
 - `runtime_scalability_qmc.pdf`
@@ -56,15 +56,15 @@ If you prefer, you can also create a `requirements.txt` with these packages.
 
 ## 3. Benchmark Script: `quine-bench.py`
 
-This script measures the **average runtime** of the QuineMcCluskey algorithm as the number of variables increases.
+This script measures the **average runtime** of the QuineMcCluskey algorithm as the number of variables increases, decomposed into total time and the times of Phase 1 (Prime Implicant Generation) and Phase 2 (Minimal Covering).
 
 ### Configuration
 
 The following constants are defined at the top of `quine-bench.py` (all comments are in Portuguese, matching the course context):
 
 - `NUM_EXECUCOES_POR_TESTE`
-  - Number of repetitions of the simplification for each configuration to obtain a more stable average time.
-  - Default in the script is set for **quick tests** (e.g. 10). For final experiments, you can increase this (e.g. 100+).
+  - Number of repetitions of the simplification for each configuration to obtain a more stable average time for total, Phase 1 and Phase 2.
+  - Default in the script is set for **quick tests**. For final experiments, you can increase this to smooth out measurement noise.
 
 - `VAR_MIN`, `VAR_MAX`
   - Minimum and maximum number of variables to test (inclusive).
@@ -79,16 +79,18 @@ The following constants are defined at the top of `quine-bench.py` (all comments
    - The function `generate_random_function(n, density)`:
      - Computes the maximum number of minterms: `2**n - 1`.
      - Selects a random subset of minterms according to the given density (without repetition).
-     - Selects about **5%** of the full space as "dont care" conditions, from the remaining minterms.
+     - Selects about **5%** of the full space as "don't care" conditions, from the remaining minterms.
    - The function `run_performance_test(...)`:
-     - Instantiates `QuineMcCluskey(False)`.
+     - Instantiates a timing wrapper around `QuineMcCluskey`.
      - Calls `qm.simplify(minterms, dont_cares)` in a loop `NUM_EXECUCOES_POR_TESTE` times.
-     - Uses `time.perf_counter()` to measure the total duration and returns the **average time per call**.
+     - Uses `time.perf_counter()` and internal timers to measure the **average total time**, **average Phase 1 time**, and **average Phase 2 time** per call.
    - The script prints a formatted table row with:
      - Number of variables,
      - Number of minterms,
-     - Number of dont cares,
-     - Average runtime in milliseconds.
+     - Number of don't cares,
+     - Average total runtime in milliseconds,
+     - Average Phase 1 runtime in milliseconds,
+     - Average Phase 2 runtime in milliseconds.
 
 2. At the end, a summary line is printed indicating that the test is finished and that the data can be used to generate the scalability plot for the report.
 
@@ -105,14 +107,14 @@ python quine-bench.py
 You will see an output table similar to:
 
 ```text
-Iniciando Teste de Escalabilidade QMC (4 a 12 variveis)
---------------------------------------------------
-| N Vars | Minterms | Don't Cares | Tempo Mdio (ms) |
---------------------------------------------------
-|   4    |    3     |     0       |        0.1178    |
-|  ...   |   ...    |    ...      |        ...       |
---------------------------------------------------
-Teste concludo. Use os dados acima para gerar o grfico de escalabilidade (Seo III).
+Starting QMC Scalability Test (4 to 13 variables)
+-----------------------------------------------------------------------------------------------
+| N Vars | Minterms | Don't Cares | Total (ms) | Phase1 (ms) | Phase2 (ms) |
+-----------------------------------------------------------------------------------------------
+|   4    |    3     |      0      |   0.5484   |   0.0299    |   0.4748    |
+|  ...   |   ...    |    ...      |    ...     |    ...      |    ...      |
+-----------------------------------------------------------------------------------------------
+Test completed.
 ```
 
 Adjust the configuration constants at the top of the file to match the desired experimental setup for your report.
@@ -130,16 +132,18 @@ At the top of the file, a Python dictionary named `data` is defined with columns
 - `N Vars (n)`
 - `Minterms`
 - `Don't Cares`
-- `Average Time (ms)`
+- `Total (ms)`
+- `Phase1 (ms)`
+- `Phase2 (ms)`
 
-These values correspond to the chosen experimental configuration and to the average timing results obtained from `quine-bench.py`.
+These values correspond to the chosen experimental configuration and to the average timing results (total and by phase) obtained from `quine-bench.py`.
 
 ### Plot generation
 
 Steps executed by `graphic-gen.py`:
 
 1. Creates a `pandas.DataFrame` from `data`.
-2. Uses `matplotlib` to plot **Average Time (ms)** vs. **Number of Variables (n)**.
+2. Uses `matplotlib` to plot **Total (ms)**, **Phase1 (ms)** and **Phase2 (ms)** vs. **Number of Variables (n)**.
 3. Sets the **Y-axis to logarithmic scale** (`plt.yscale('log')`) to highlight the exponential growth of runtime.
 4. Adds labels, grid, and optional value labels above each point.
 5. Saves the figure as `runtime_scalability_qmc.pdf` with tight bounding boxes for high-quality inclusion in LaTeX / IEEE templates.
